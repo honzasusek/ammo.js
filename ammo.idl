@@ -416,6 +416,15 @@ interface btGeneric6DofSpringConstraint {
 };
 btGeneric6DofSpringConstraint implements btGeneric6DofConstraint;
 
+interface btGeneric6DofSpringConstraint {
+  void btGeneric6DofSpringConstraint([Ref] btRigidBody rbA, [Ref] btRigidBody rbB, [Ref] btTransform frameInA, [Ref] btTransform frameInB, boolean useLinearFrameReferenceFrameA);
+  void btGeneric6DofSpringConstraint([Ref] btRigidBody rbB, [Ref] btTransform frameInB, boolean useLinearFrameReferenceFrameB);
+  void enableSpring( long index, boolean onOff );
+  void setStiffness( long index, float stiffness );
+  void setDamping( long index, float damping );
+};
+btGeneric6DofSpringConstraint implements btGeneric6DofConstraint;
+
 interface btSequentialImpulseConstraintSolver {
   void btSequentialImpulseConstraintSolver();
 };
