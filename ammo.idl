@@ -369,6 +369,8 @@ interface btRigidBody {
   btMotionState getMotionState();
   void setAngularFactor([Const, Ref] btVector3 angularFactor);
   btRigidBody upcast([Const] btCollisionObject colObj);
+  [Const] long getNumConstraintRefs();
+  btTypedConstraint getConstraintRef( long index );
 };
 btRigidBody implements btCollisionObject;
 
@@ -490,6 +492,7 @@ interface btContactSolverInfo {
 
 interface btDynamicsWorld {
   void addAction(btActionInterface action);
+  void removeAction(btActionInterface action);
   [Value] btContactSolverInfo getSolverInfo();
 };
 btDynamicsWorld implements btCollisionWorld;
@@ -519,7 +522,7 @@ interface btVehicleTuning {
   attribute float m_suspensionDamping;
   attribute float m_maxSuspensionTravelCm;
   attribute float m_frictionSlip;
-  attribute float m_maxSuspensionForce; 
+  attribute float m_maxSuspensionForce;  
 };
 
 interface btVehicleRaycaster {
@@ -586,6 +589,7 @@ interface btRaycastVehicle {
   [Ref] btWheelInfo getWheelInfo(long index);
   void setBrake(float brake, long wheelIndex);
   void setCoordinateSystem(long rightIndex, long upIndex, long forwardIndex);
+  [Const] float getCurrentSpeedKmHour();
 };
 btRaycastVehicle implements btActionInterface;
 
