@@ -66,6 +66,18 @@ subject to the following restrictions:
 #include "BulletCollision/CollisionShapes/btStaticPlaneShape.h"
 
 
+extern ContactAddedCallback gContactAddedCallback;
+
+btCollisionWorld::btCollisionWorld(btDispatcher* dispatcher,btBroadphaseInterface* pairCache, btCollisionConfiguration* collisionConfiguration)
+:m_dispatcher1(dispatcher),
+m_broadphasePairCache(pairCache),
+m_debugDrawer(0),
+m_forceUpdateAllAabbs(true)
+{
+	
+}
+
+
 btCollisionWorld::~btCollisionWorld()
 {
 
@@ -88,6 +100,20 @@ btCollisionWorld::~btCollisionWorld()
 	}
 
 }
+
+void	btCollisionWorld::setCustomMaterialCombinerCallback()
+{
+	gContactAddedCallback = CustomMaterialCombinerCallback;
+}
+
+
+bool	btCollisionWorld::CustomMaterialCombinerCallback(btManifoldPoint& cp,const btCollisionObjectWrapper* colObj0Wrap,int partId0,int index0,const btCollisionObjectWrapper* colObj1Wrap,int partId1,int index1)
+{
+	btAdjustInternalEdgeContacts(cp, colObj0Wrap, colObj1Wrap, partId0, index0, 0);
+	return true;
+}
+
+
 
 
 

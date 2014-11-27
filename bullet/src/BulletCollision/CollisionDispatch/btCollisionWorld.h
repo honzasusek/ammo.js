@@ -542,6 +542,9 @@ public:
 	virtual	void	serialize(btSerializer* serializer);
 	
 	static void	btGenerateInternalEdgeInfoAlias(btBvhTriangleMeshShape*trimeshShape, btTriangleInfoMap* triangleInfoMap);
+	void	setCustomMaterialCombinerCallback();
+	static bool	CustomMaterialCombinerCallback(btManifoldPoint& cp,const btCollisionObjectWrapper* colObj0Wrap,int partId0,int index0,const btCollisionObjectWrapper* colObj1Wrap,int partId1,int index1);
+
 	
 };
 
