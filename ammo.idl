@@ -176,7 +176,7 @@ ClosestConvexResultCallback implements ConvexResultCallback;
 
 interface btCollisionShape {
   void setLocalScaling([Const, Ref] btVector3 scaling);
-  void calculateLocalInertia(float mass, [Ref] btVector3 inertia);
+  void calculateLocalInertia(float mass, [Ref] btVector3 inertia);  
 };
 
 interface btConvexShape {
@@ -279,6 +279,7 @@ btTriangleMeshShape implements btConcaveShape;
 
 interface btBvhTriangleMeshShape {
   void btBvhTriangleMeshShape(btStridingMeshInterface meshInterface, boolean useQuantizedAabbCompression, optional boolean buildBvh);
+  btTriangleInfoMap getTriangleInfoMap();
 };
 btBvhTriangleMeshShape implements btTriangleMeshShape;
 
@@ -485,7 +486,8 @@ interface btCollisionWorld {
   void addCollisionObject(btCollisionObject collisionObject, optional short collisionFilterGroup, optional short collisionFilterMask);
   [Const] btBroadphaseInterface getBroadphase ();
   void convexSweepTest([Const] btConvexShape castShape, [Const, Ref] btTransform from, [Const, Ref] btTransform to, [Ref] ConvexResultCallback resultCallback, float allowedCcdPenetration); 
-  void contactPairTest([Const] btCollisionObject colObjA, [Const] btCollisionObject colObjB, [Ref] ContactResultCallback resultCallback);  
+  void contactPairTest([Const] btCollisionObject colObjA, [Const] btCollisionObject colObjB, [Ref] ContactResultCallback resultCallback);
+  void btGenerateInternalEdgeInfoAlias(btBvhTriangleMeshShape trimeshShape, btTriangleInfoMap triangleInfoMap);
 };
 
 interface btContactSolverInfo {
@@ -612,4 +614,6 @@ interface btGhostPairCallback {
   void btGhostPairCallback();
 };
 
-
+interface btTriangleInfoMap {
+  void btTriangleInfoMap();
+};

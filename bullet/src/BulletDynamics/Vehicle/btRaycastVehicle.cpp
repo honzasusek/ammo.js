@@ -749,7 +749,7 @@ void* btDefaultVehicleRaycaster::castRay(const btVector3& from,const btVector3& 
 {
 //	RayResultCallback& resultCallback;
 
-	btCollisionWorld::ClosestRayResultCallback rayCallback(from,to);
+	btCollisionWorld::InterpolatedClosestRayResultCallback rayCallback(from,to);
 
 	m_dynamicsWorld->rayTest(from, to, rayCallback);
 

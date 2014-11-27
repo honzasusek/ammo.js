@@ -25,16 +25,9 @@ class btVehicleTuning;
 class btRaycastVehicle : public btActionInterface
 {
 
-		btAlignedObjectArray<btVector3>	m_forwardWS;
-		btAlignedObjectArray<btVector3>	m_axle;
-		btAlignedObjectArray<btScalar>	m_forwardImpulse;
-		btAlignedObjectArray<btScalar>	m_sideImpulse;
-	
-		///backwards compatibility
-		int	m_userConstraintType;
-		int	m_userConstraintId;
+		
 
-public:
+public:	
 	class btVehicleTuning
 		{
 			public:
@@ -57,6 +50,15 @@ public:
 
 		};
 private:
+
+	btAlignedObjectArray<btVector3>	m_forwardWS;
+	btAlignedObjectArray<btVector3>	m_axle;
+	btAlignedObjectArray<btScalar>	m_forwardImpulse;
+	btAlignedObjectArray<btScalar>	m_sideImpulse;
+
+	///backwards compatibility
+	int	m_userConstraintType;
+	int	m_userConstraintId;
 
 	btScalar	m_tau;
 	btScalar	m_damping;

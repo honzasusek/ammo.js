@@ -84,6 +84,9 @@ class btSerializer;
 #include "BulletCollision/BroadphaseCollision/btOverlappingPairCache.h"
 #include "LinearMath/btAlignedObjectArray.h"
 
+#include "BulletCollision/CollisionDispatch/btInternalEdgeUtility.h"
+#include "BulletCollision/CollisionDispatch/btCollisionObjectWrapper.h"
+
 ///CollisionWorld is interface and container for the collision detection
 class btCollisionWorld
 {
@@ -238,7 +241,7 @@ public:
 
 		virtual	btScalar	addSingleResult(LocalRayResult& rayResult,bool normalInWorldSpace) = 0;
 	};
-
+	
 	struct	ClosestRayResultCallback : public RayResultCallback
 	{
 		ClosestRayResultCallback(const btVector3&	rayFromWorld,const btVector3&	rayToWorld)
@@ -271,6 +274,24 @@ public:
 			m_hitPointWorld.setInterpolate3(m_rayFromWorld,m_rayToWorld,rayResult.m_hitFraction);
 			return rayResult.m_hitFraction;
 		}
+	};
+	
+	struct	InterpolatedClosestRayResultCallback : public RayResultCallback
+	{
+		InterpolatedClosestRayResultCallback(const btVector3&	rayFromWorld,const btVector3&	rayToWorld)
+		:m_rayFromWorld(rayFromWorld),
+		m_rayToWorld(rayToWorld)
+		{
+			//m_flags = 1 << 2;
+		}
+		
+		btVector3	m_rayFromWorld;//used to calculate hitPointWorld from hitFraction
+		btVector3	m_rayToWorld;
+
+		btVector3	m_hitNormalWorld;
+		btVector3	m_hitPointWorld;
+
+		virtual	btScalar	addSingleResult(LocalRayResult& rayResult,bool normalInWorldSpace);
 	};
 
 	struct	AllHitsRayResultCallback : public RayResultCallback
@@ -519,7 +540,9 @@ public:
 
 	///Preliminary serialization test for Bullet 2.76. Loading those files requires a separate parser (Bullet/Demos/SerializeDemo)
 	virtual	void	serialize(btSerializer* serializer);
-
+	
+	static void	btGenerateInternalEdgeInfoAlias(btBvhTriangleMeshShape*trimeshShape, btTriangleInfoMap* triangleInfoMap);
+	
 };
 
 
