@@ -20,7 +20,8 @@ subject to the following restrictions:
 #include "BulletCollision/CollisionShapes/btConvexShape.h"
 #include "BulletCollision/NarrowPhaseCollision/btGjkEpaPenetrationDepthSolver.h"
 #include "BulletCollision/CollisionShapes/btSphereShape.h" //for raycasting
-#include "BulletCollision/CollisionShapes/btBvhTriangleMeshShape.h" //for raycasting
+#include "BulletCollision/CollisionShapes/btBvhTriangleMeshShape.h"
+#include "BulletCollision/CollisionShapes/btScaledBvhTriangleMeshShape.h"
 #include "BulletCollision/NarrowPhaseCollision/btRaycastCallback.h"
 #include "BulletCollision/CollisionShapes/btCompoundShape.h"
 #include "BulletCollision/NarrowPhaseCollision/btSubSimplexConvexCast.h"
@@ -65,6 +66,7 @@ subject to the following restrictions:
 #include "BulletCollision/CollisionShapes/btStaticPlaneShape.h"
 
 
+extern ContactAddedCallback gContactAddedCallback;
 
 btCollisionWorld::btCollisionWorld(btDispatcher* dispatcher,btBroadphaseInterface* pairCache, btCollisionConfiguration* collisionConfiguration)
 :m_dispatcher1(dispatcher),
@@ -72,6 +74,7 @@ m_broadphasePairCache(pairCache),
 m_debugDrawer(0),
 m_forceUpdateAllAabbs(true)
 {
+	
 }
 
 
@@ -96,9 +99,19 @@ btCollisionWorld::~btCollisionWorld()
 		}
 	}
 
-
 }
 
+void	btCollisionWorld::setCustomMaterialCombinerCallback()
+{
+	gContactAddedCallback = CustomMaterialCombinerCallback;
+}
+
+
+bool	btCollisionWorld::CustomMaterialCombinerCallback(btManifoldPoint& cp,const btCollisionObjectWrapper* colObj0Wrap,int partId0,int index0,const btCollisionObjectWrapper* colObj1Wrap,int partId1,int index1)
+{
+	btAdjustInternalEdgeContacts(cp, colObj0Wrap, colObj1Wrap, partId0, index0, 0);
+	return true;
+}
 
 
 
@@ -1550,3 +1563,219 @@ void	btCollisionWorld::serialize(btSerializer* serializer)
 	serializer->finishSerialization();
 }
 
+void	btCollisionWorld::btGenerateInternalEdgeInfoAlias (btBvhTriangleMeshShape* trimeshShape, btTriangleInfoMap* triangleInfoMap)
+{
+	btGenerateInternalEdgeInfo (trimeshShape, triangleInfoMap);
+}
+
+static int	btGetHash(int partId, int triangleIndex)
+{
+	int hash = (partId<<(31-MAX_NUM_PARTS_IN_BITS)) | triangleIndex;
+	return hash;
+}
+
+/// Compute the Barycentric coordinates of position inside triangle p1, p2, p3
+btVector3 BarycentricCoordinates(const btVector3& position, const btVector3& p1, const btVector3& p2, const btVector3& p3)
+{
+	btVector3 edge1 = p2 - p1;
+	btVector3 edge2 = p3 - p1;
+	// Area of triangle ABC
+	btScalar p1p2p3 = edge1.cross(edge2).length2();
+	// Area of BCP
+	btScalar p2p3p = (p3 - p2).cross(position - p2).length2();
+	// Area of CAP
+	btScalar p3p1p = edge2.cross(position - p3).length2();
+	btScalar s = btSqrt(p2p3p / p1p2p3);
+	btScalar t = btSqrt(p3p1p / p1p2p3);
+	btScalar w = 1.0f - s - t;
+	//#ifdef BUILD_DEBUG
+	// // Unit test...
+	// btVector3 regen_position = s * p1 + t * p2 + w * p3;
+	// btAssert((regen_position - position).length2() < 0.0001f);
+	//#endif
+	return btVector3(s, t, w);
+}
+
+// Given a point and a line segment (defined by two points), compute the closest point
+// in the line.  Cap the point at the endpoints of the line segment.
+void btGetNearestPointInLineSegment(const btVector3 &point, const btVector3& line0, const btVector3& line1, btVector3& nearestPoint)
+{
+	btVector3 lineDelta     = line1 - line0;
+
+	// Handle degenerate lines
+	if ( lineDelta.fuzzyZero())
+	{
+		nearestPoint = line0;
+	}
+	else
+	{
+		btScalar delta = (point-line0).dot(lineDelta) / (lineDelta).dot(lineDelta);
+
+		// Clamp the point to conform to the segment's endpoints
+		if ( delta < 0 )
+			delta = 0;
+		else if ( delta > 1 )
+			delta = 1;
+
+		nearestPoint = line0 + lineDelta*delta;
+	}
+}
+
+btScalar btCollisionWorld::InterpolatedClosestRayResultCallback::addSingleResult(LocalRayResult& rayResult,bool normalInWorldSpace)
+{
+	 
+	
+	//caller already does the filter on the m_closestHitFraction
+	btAssert(rayResult.m_hitFraction <= m_closestHitFraction);
+	
+	m_closestHitFraction = rayResult.m_hitFraction;
+	m_collisionObject = rayResult.m_collisionObject;
+	if (normalInWorldSpace)
+	{
+		m_hitNormalWorld = rayResult.m_hitNormalLocal;
+	} else
+	{
+		///need to transform normal into worldspace
+		m_hitNormalWorld = m_collisionObject->getWorldTransform().getBasis()*rayResult.m_hitNormalLocal;
+	}
+	m_hitPointWorld.setInterpolate3(m_rayFromWorld,m_rayToWorld,rayResult.m_hitFraction);
+	
+	// interpolation start
+	
+	//btCollisionObjectWrapper* colObj0Wrap = rayResult.m_collisionObject;
+	int partId0 = rayResult.m_localShapeInfo->m_shapePart;
+	int index0 = rayResult.m_localShapeInfo->m_triangleIndex;
+	btTransform transform = rayResult.m_collisionObject->getWorldTransform();
+	btVector3 hitPointLocal = m_collisionObject->getWorldTransform().inverse()*m_hitPointWorld; // getBasis??
+	 
+	btBvhTriangleMeshShape* trimesh = 0;
+		
+		if( m_collisionObject->getCollisionShape()->getShapeType() == SCALED_TRIANGLE_MESH_SHAPE_PROXYTYPE )
+		   trimesh = ((btScaledBvhTriangleMeshShape*)m_collisionObject->getCollisionShape())->getChildShape();
+	   else	   
+		   trimesh = (btBvhTriangleMeshShape*)m_collisionObject->getCollisionShape();
+		   
+	btTriangleInfoMap* triangleInfoMapPtr = (btTriangleInfoMap*) trimesh->getTriangleInfoMap();
+	if (!triangleInfoMapPtr)
+		return 0;
+
+	int hash = btGetHash(partId0,index0);
+
+
+	btTriangleInfo* info = triangleInfoMapPtr->find(hash);
+	if (!info)
+		return 0;
+
+	//btScalar frontFacing = (normalAdjustFlags & BT_TRIANGLE_CONVEX_BACKFACE_MODE)==0? 1.f : -1.f;
+	
+	btStridingMeshInterface* meshInterface = trimesh->getMeshInterface();
+	const btVector3& meshScaling = meshInterface->getScaling();
+	
+	const unsigned char *vertexbase = 0;
+	int numverts = 0;
+	PHY_ScalarType type = PHY_INTEGER;
+	int stride = 0;
+	const unsigned char *indexbase = 0;
+	int indexstride = 0;
+	int numfaces = 0;
+	int triangleIndex = index0;
+	int partId = partId0;
+	PHY_ScalarType indicestype = PHY_INTEGER;
+	//PHY_ScalarType indexType=0;
+
+	btVector3 triangleVerts[3];
+	meshInterface->getLockedReadOnlyVertexIndexBase(&vertexbase,numverts,type,stride,&indexbase,indexstride,numfaces,indicestype,partId);
+	btVector3 aabbMin,aabbMax;
+	
+	unsigned int* gfxbase = (unsigned int*)(indexbase+triangleIndex*indexstride);
+	
+	for (int j=2;j>=0;j--)
+	{
+		int graphicsindex = indicestype==PHY_SHORT?((unsigned short*)gfxbase)[j]:gfxbase[j];
+		if (type == PHY_FLOAT)
+		{
+			float* graphicsbase = (float*)(vertexbase+graphicsindex*stride);
+			triangleVerts[j] = btVector3(
+				graphicsbase[0]*meshScaling.getX(),
+				graphicsbase[1]*meshScaling.getY(),
+				graphicsbase[2]*meshScaling.getZ());
+		}
+		else
+		{
+			double* graphicsbase = (double*)(vertexbase+graphicsindex*stride);
+			triangleVerts[j] = btVector3( btScalar(graphicsbase[0]*meshScaling.getX()), btScalar(graphicsbase[1]*meshScaling.getY()), btScalar(graphicsbase[2]*meshScaling.getZ()));
+		}
+	}
+	
+	btVector3 barry = BarycentricCoordinates(transform.invXform(m_hitPointWorld), triangleVerts[0], triangleVerts[1], triangleVerts[2]);
+		
+	btVector3 tri_normal;
+	tri_normal = (triangleVerts[1]-triangleVerts[0]).cross(triangleVerts[2]-triangleVerts[0]);
+	tri_normal.normalize();	
+	
+	// Get closest edge
+	btVector3 nearest;
+	btGetNearestPointInLineSegment(hitPointLocal,triangleVerts[0],triangleVerts[1],nearest);
+	int      bestedge=-1;
+	btScalar    disttobestedge=BT_LARGE_FLOAT;
+		//
+		// Edge 0 -> 1
+	if (btFabs(info->m_edgeV0V1Angle)< triangleInfoMapPtr->m_maxEdgeAngleThreshold)
+	{	
+		   btVector3 nearest;
+		   btGetNearestPointInLineSegment( hitPointLocal, triangleVerts[0],triangleVerts[1], nearest );
+		   btScalar     len=(hitPointLocal-nearest).length();
+		   //
+		   if( len < disttobestedge )
+		   {
+		      bestedge=0;
+		      disttobestedge=len;
+		}	      
+	   }	   
+		// Edge 1 -> 2
+	if (btFabs(info->m_edgeV1V2Angle)< triangleInfoMapPtr->m_maxEdgeAngleThreshold)
+	{	
+		   btVector3 nearest;
+		   btGetNearestPointInLineSegment( hitPointLocal, triangleVerts[1],triangleVerts[2], nearest );
+		   btScalar     len=(hitPointLocal-nearest).length();
+		   //
+		   if( len < disttobestedge )
+		   {
+		      bestedge=1;
+		      disttobestedge=len;
+		}	      
+	}	   
+		// Edge 2 -> 0
+	if (btFabs(info->m_edgeV2V0Angle)< triangleInfoMapPtr->m_maxEdgeAngleThreshold)
+	{	
+		btVector3 nearest;
+		btGetNearestPointInLineSegment( hitPointLocal, triangleVerts[2],triangleVerts[0], nearest );
+		btScalar     len=(hitPointLocal-nearest).length();
+		//
+		if( len < disttobestedge )
+		{
+		   bestedge=2;
+		   disttobestedge=len;
+		}	      
+	}
+	
+	btVector3 n0 = quatRotate(btQuaternion(triangleVerts[0]-triangleVerts[1],info->m_edgeV0V1Angle),tri_normal);
+	btVector3 n1 = quatRotate(btQuaternion(triangleVerts[1]-triangleVerts[2],info->m_edgeV1V2Angle),tri_normal);
+	btVector3 n2 = quatRotate(btQuaternion(triangleVerts[2]-triangleVerts[0],info->m_edgeV2V0Angle),tri_normal);	 
+		
+	//btVector3 result = barry.x() * rayResult.m_hitNormalLocal + barry.y() * rayResult.m_hitNormalLocal + barry.z() * rayResult.m_hitNormalLocal;
+	btVector3 n;
+	if(bestedge==0) n = n0;
+	else if(bestedge==1) n = n1;
+	else n = n2;
+	btVector3 result = barry.x() * n + barry.y() * n + barry.z() * n;
+	//btVector3 result = barry.x() * n0 + barry.y() * n1 + barry.z() * n2;
+	// Transform back into world space
+	result = transform.getBasis() * result;
+	result.normalize();
+	
+	m_hitNormalWorld = result;
+	meshInterface->unLockReadOnlyVertexBase(partId);
+		
+	return rayResult.m_hitFraction;
+}
