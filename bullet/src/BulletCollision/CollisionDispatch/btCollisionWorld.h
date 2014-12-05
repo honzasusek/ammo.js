@@ -282,7 +282,6 @@ public:
 		:m_rayFromWorld(rayFromWorld),
 		m_rayToWorld(rayToWorld)
 		{
-			//m_flags = 1 << 2;
 		}
 		
 		btVector3	m_rayFromWorld;//used to calculate hitPointWorld from hitFraction

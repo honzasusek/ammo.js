@@ -109,7 +109,7 @@ void	btCollisionWorld::setCustomMaterialCombinerCallback()
 
 bool	btCollisionWorld::CustomMaterialCombinerCallback(btManifoldPoint& cp,const btCollisionObjectWrapper* colObj0Wrap,int partId0,int index0,const btCollisionObjectWrapper* colObj1Wrap,int partId1,int index1)
 {
-	btAdjustInternalEdgeContacts(cp, colObj0Wrap, colObj1Wrap, partId0, index0, 0);
+	btAdjustInternalEdgeContacts(cp, colObj0Wrap, colObj0Wrap, partId1, index1, 0);
 	return true;
 }
 
@@ -1680,7 +1680,7 @@ btScalar btCollisionWorld::InterpolatedClosestRayResultCallback::addSingleResult
 	int numfaces = 0;
 	int triangleIndex = index0;
 	int partId = partId0;
-	PHY_ScalarType indicestype = PHY_INTEGER;
+	PHY_ScalarType indicestype = PHY_INTEGER; 
 	//PHY_ScalarType indexType=0;
 
 	btVector3 triangleVerts[3];
@@ -1767,9 +1767,11 @@ btScalar btCollisionWorld::InterpolatedClosestRayResultCallback::addSingleResult
 	btVector3 n;
 	if(bestedge==0) n = n0;
 	else if(bestedge==1) n = n1;
-	else n = n2;
+	else if(bestedge==2) n = n2;
+	else n = m_hitNormalWorld;
+	btVector3 in = n0.lerp(n1.lerp(n2,0.5),0.5);
 	btVector3 result = barry.x() * n + barry.y() * n + barry.z() * n;
-	//btVector3 result = barry.x() * n0 + barry.y() * n1 + barry.z() * n2;
+	//btVector3 result = barry.x() * in + barry.y() * in + barry.z() * in;
 	// Transform back into world space
 	result = transform.getBasis() * result;
 	result.normalize();
